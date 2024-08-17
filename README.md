@@ -1,2 +1,2 @@
 # reminder-rs
-A command line tool for iCalendar reminders/todos.
+A CLI for CalDAV reminders/todos.
