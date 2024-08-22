@@ -8,11 +8,11 @@ use clap:: {
 #[command(version, about, long_about = None)]
 pub struct ReminderArgs {
     #[clap(subcommand)]
-    pub subcommand: SubCommand,
+    pub subcommand: ReminderSubcommands,
 }
 
 #[derive(Debug, Subcommand)]
-pub enum SubCommand {
+pub enum ReminderSubcommands {
     /// Open TUI
     Interactive(InteractiveCommand),
     /// Create new reminder in TUI or with arguments
@@ -37,6 +37,13 @@ pub enum SubCommand {
     Done(ActionCommand),
     /// Show all info about reminder(s)
     Info(ActionCommand),
+    /// TODO Remove
+    Test(TestCommand)
+}
+
+#[derive(Debug, Args)]
+pub struct TestCommand {
+    pub pong: Option<i32>
 }
 
 #[derive(Debug, Args)]
@@ -78,7 +85,7 @@ pub struct NewCommand {
     description: Option<String>,
     #[arg(short, long)]
     summary: Option<String>,
-    #[arg(short, long, default_value=false)]
+    #[arg(short, long)]
     tui: bool
 }
 
