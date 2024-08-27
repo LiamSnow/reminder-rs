@@ -27,49 +27,53 @@ fn main() {
 
     match &args.subcommand {
         ReminderSubcommands::Test(TestCommand { pong: _ }) => {
-            let _ = read_calendars();
+            let calendars = read_calendars().unwrap();
+
+            for calendar in calendars {
+                println!("{}", calendar.file_name().unwrap().to_string_lossy());
+                let todos = read_todos(&calendar).unwrap();
+
+                for todo in todos {
+                    println!(" - todo: {}", todo.summary.unwrap());
+                }
+            }
         }
         _ => {}
     }
 }
 
-fn read_calendars() -> std::io::Result<()> {
+fn read_calendars() -> Option<Vec<PathBuf>> {
     let test_calendars_path = Path::new("test_calendars");
 
     if !test_calendars_path.is_dir() {
         println!("Error: 'test_calendars' directory not found");
-        return Ok(());
+        return None;
     }
 
-    for entry in fs::read_dir(test_calendars_path)? {
-        let entry = entry?;
-        let path = entry.path();
+    let mut calendars: Vec<PathBuf> = vec![];
 
-        if path.is_dir() {
-            let calendar_name = path.file_name().unwrap();
-            let subfolder = path.join(calendar_name);
-            let vtodos = (if subfolder.is_dir() {
-                read_vtodos(&subfolder)
+    for folder in fs::read_dir(test_calendars_path).ok()? {
+        let folder = folder.ok()?;
+        let folder_path = folder.path();
+
+        if folder_path.is_dir() {
+            let calendar_name = folder_path.file_name().unwrap();
+            let subfolder_path = folder_path.join(calendar_name);
+            if subfolder_path.is_dir() {
+                calendars.push(subfolder_path);
             } else {
-                read_vtodos(&path)
-            })
-            .unwrap();
-
-            println!("Calendar: {}", calendar_name.to_string_lossy());
-
-            for vtodo in vtodos {
-                println!(" - todo: {}", vtodo.summary.unwrap());
+                calendars.push(folder_path);
             }
         }
     }
 
-    Ok(())
+    Some(calendars)
 }
 
-fn read_vtodos(dir_path: &PathBuf) -> io::Result<Vec<VTodo>> {
-    let mut vtodos = Vec::new();
+fn read_todos(calendar_path: &PathBuf) -> io::Result<Vec<VTodo>> {
+    let mut todos = Vec::new();
 
-    for entry in fs::read_dir(dir_path)? {
+    for entry in fs::read_dir(calendar_path)? {
         let entry = entry?;
         let path = entry.path();
 
@@ -80,8 +84,8 @@ fn read_vtodos(dir_path: &PathBuf) -> io::Result<Vec<VTodo>> {
 
                 while let Some(Ok(line)) = lines.next() {
                     if line.trim() == "BEGIN:VTODO" {
-                        if let Some(vtodo) = parse_vtodo(&mut lines) {
-                            vtodos.push(vtodo);
+                        if let Some(todo) = parse_todo(&mut lines) {
+                            todos.push(todo);
                         }
                     }
                 }
@@ -89,11 +93,11 @@ fn read_vtodos(dir_path: &PathBuf) -> io::Result<Vec<VTodo>> {
         }
     }
 
-    Ok(vtodos)
+    Ok(todos)
 }
 
-fn parse_vtodo<B: BufRead>(lines: &mut std::io::Lines<B>) -> Option<VTodo> {
-    let mut vtodo = VTodo {
+fn parse_todo<B: BufRead>(lines: &mut std::io::Lines<B>) -> Option<VTodo> {
+    let mut todo = VTodo {
         completed: None,
         created: None,
         dtstamp: None,
@@ -110,23 +114,23 @@ fn parse_vtodo<B: BufRead>(lines: &mut std::io::Lines<B>) -> Option<VTodo> {
     while let Some(Ok(line)) = lines.next() {
         let line = line.trim();
         if line == "END:VTODO" {
-            return Some(vtodo);
+            return Some(todo);
         }
 
         let parts: Vec<&str> = line.splitn(2, ':').collect();
         if parts.len() == 2 {
             match parts[0] {
-                "COMPLETED" => vtodo.completed = Some(parts[1].to_string()),
-                "CREATED" => vtodo.created = Some(parts[1].to_string()),
-                "DTSTAMP" => vtodo.dtstamp = Some(parts[1].to_string()),
-                "LAST-MODIFIED" => vtodo.last_modified = Some(parts[1].to_string()),
-                "PERCENT-COMPLETE" => vtodo.percent_complete = parts[1].parse().ok(),
-                "PRIORITY" => vtodo.priority = parts[1].parse().ok(),
-                "SEQUENCE" => vtodo.sequence = parts[1].parse().ok(),
-                "STATUS" => vtodo.status = Some(parts[1].to_string()),
-                "DESCRIPTION" => vtodo.description = Some(parts[1].to_string()),
-                "SUMMARY" => vtodo.summary = Some(parts[1].to_string()),
-                "UID" => vtodo.uid = Some(parts[1].to_string()),
+                "COMPLETED" => todo.completed = Some(parts[1].to_string()),
+                "CREATED" => todo.created = Some(parts[1].to_string()),
+                "DTSTAMP" => todo.dtstamp = Some(parts[1].to_string()),
+                "LAST-MODIFIED" => todo.last_modified = Some(parts[1].to_string()),
+                "PERCENT-COMPLETE" => todo.percent_complete = parts[1].parse().ok(),
+                "PRIORITY" => todo.priority = parts[1].parse().ok(),
+                "SEQUENCE" => todo.sequence = parts[1].parse().ok(),
+                "STATUS" => todo.status = Some(parts[1].to_string()),
+                "DESCRIPTION" => todo.description = Some(parts[1].to_string()),
+                "SUMMARY" => todo.summary = Some(parts[1].to_string()),
+                "UID" => todo.uid = Some(parts[1].to_string()),
                 _ => {}
             }
         }
