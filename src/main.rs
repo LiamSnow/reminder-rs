@@ -1,140 +1,100 @@
-mod args;
+use minidom::Element;
+use reqwest::header::CONTENT_TYPE;
+use reqwest::Client;
+use reqwest::Method;
+use types::Calendar;
+use util::follow_tree;
 
-use std::fs;
-use std::io::{self, BufRead};
-use std::path::{Path, PathBuf};
+mod util;
+mod types;
 
-use args::{ReminderArgs, ReminderSubcommands, TestCommand};
-use clap::Parser;
+const BASE_URL: &str = "";
+const USERNAME: &str = "";
+const PASSWORD: Option<&str> = Some("");
+const NS_D: &str = "DAV:";
+const NS_C: &str = "urn:ietf:params:xml:ns:caldav";
+const NS_CS: &str = "http://calendarserver.org/ns/";
+const NS_C_ATR: &str = "xmlns:c=\"urn:ietf:params:xml:ns:caldav\"";
+const NS_CS_ATR: &str = "xmlns:cs=\"http://calendarserver.org/ns/\"";
 
-#[derive(Debug)]
-struct VTodo {
-    completed: Option<String>,
-    created: Option<String>,
-    dtstamp: Option<String>,
-    last_modified: Option<String>,
-    percent_complete: Option<i32>,
-    priority: Option<i32>,
-    sequence: Option<i32>,
-    status: Option<String>,
-    description: Option<String>,
-    summary: Option<String>,
-    uid: Option<String>,
+pub async fn request(client: &Client, method: Method, path: &str, depth: i32, body: String) -> Option<String> {
+    let res = client
+        .request(method, BASE_URL.to_string() + &path)
+        .header("Depth", depth)
+        .header(CONTENT_TYPE, "application/xml")
+        .basic_auth(USERNAME, PASSWORD)
+        .body(body)
+        .send()
+        .await
+        .ok()?;
+    res.text().await.ok()
 }
 
-fn main() {
-    let args = ReminderArgs::parse();
+pub async fn propfind(client: &Client, path: &str, depth: i32, attr: &str, props: &str) -> Option<Element> {
+    let method = Method::from_bytes(b"PROPFIND").unwrap();
+    let body_start = format!("<d:propfind xmlns:d=\"DAV:\" {attr}>");
+    let body_end = "</d:propfind>";
+    let body = body_start + props + body_end;
+    println!("body={body}\n");
+    let res = request(client, method, path, depth, body).await?;
+    println!("res={res}\n");
+    Some(res.parse().ok()?)
+}
 
-    match &args.subcommand {
-        ReminderSubcommands::Test(TestCommand { pong: _ }) => {
-            let calendars = read_calendars().unwrap();
+pub async fn get_principal(client: &Client) -> Option<String> {
+    let root = propfind(client, "", 0, "", "<d:prop><d:current-user-principal /></d:prop>").await?;
+    Some(follow_tree(&root, "response.propstat.prop.current-user-principal.href", NS_D)?.text())
+}
 
-            for calendar in calendars {
-                println!("{}", calendar.file_name().unwrap().to_string_lossy());
-                let todos = read_todos(&calendar).unwrap();
+pub async fn get_homeset(client: &Client, path: &str) -> Option<String> {
+    let root = propfind(client, path, 0, NS_C_ATR, "<d:self/><d:prop><d:current-home-set /></d:prop>").await?;
+    Some(follow_tree(&root, "response.href", NS_D)?.text())
+}
 
-                for todo in todos {
-                    println!(" - todo: {}", todo.summary.unwrap());
-                }
-            }
-        }
-        _ => {}
+pub fn parse_calendar(el: &Element) -> Option<Calendar> {
+    let url = follow_tree(el, "href", NS_D)?.text();
+    let prop = follow_tree(el, "propstat.prop", NS_D)?;
+    let name = prop.get_child("displayname", NS_D)?.text();
+    let ctag = prop.get_child("getctag", NS_CS)?.text();
+    let supports_todo = prop.get_child("supported-calendar-component-set", NS_C)?.nodes()
+        .filter_map(|node| node.as_element())
+        .any(|elem| elem.attr("name").map_or(false, |name| name.contains("VTODO")));
+    match supports_todo {
+        true => Some(Calendar { url, name, ctag }),
+        false => None,
     }
 }
 
-fn read_calendars() -> Option<Vec<PathBuf>> {
-    let test_calendars_path = Path::new("test_calendars");
-
-    if !test_calendars_path.is_dir() {
-        println!("Error: 'test_calendars' directory not found");
-        return None;
-    }
-
-    let mut calendars: Vec<PathBuf> = vec![];
-
-    for folder in fs::read_dir(test_calendars_path).ok()? {
-        let folder = folder.ok()?;
-        let folder_path = folder.path();
-
-        if folder_path.is_dir() {
-            let calendar_name = folder_path.file_name().unwrap();
-            let subfolder_path = folder_path.join(calendar_name);
-            if subfolder_path.is_dir() {
-                calendars.push(subfolder_path);
-            } else {
-                calendars.push(folder_path);
-            }
-        }
-    }
-
-    Some(calendars)
+pub async fn list_calendars(client: &Client, path: &str) -> Option<Vec<Calendar>> {
+    //<C:supported-calendar-component-set><C:comp name="VTODO" /></C:supported-calendar-component-set>
+    let props = r#"
+        <d:prop>
+            <d:displayname />
+            <c:supported-calendar-component-set />
+            <cs:getctag />
+        </d:prop>
+    "#;
+    let attr = NS_C_ATR.to_owned() + " " + NS_CS_ATR;
+    let root = propfind(client, path, 1, &attr, props).await?;
+    let cals: Vec<Calendar> = root.children()
+        .filter_map(|response| parse_calendar(response))
+        .collect();
+    Some(cals)
 }
 
-fn read_todos(calendar_path: &PathBuf) -> io::Result<Vec<VTodo>> {
-    let mut todos = Vec::new();
+#[tokio::main]
+async fn main() {
+    let client = reqwest::Client::new();
 
-    for entry in fs::read_dir(calendar_path)? {
-        let entry = entry?;
-        let path = entry.path();
+    let prin = get_principal(&client).await.unwrap();
+    println!("Principal: {}\n", prin);
 
-        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("ics") {
-            if let Ok(file) = fs::File::open(&path) {
-                let reader = io::BufReader::new(file);
-                let mut lines = reader.lines();
+    let home = get_homeset(&client, &prin).await.unwrap();
+    println!("Home: {}\n", home);
 
-                while let Some(Ok(line)) = lines.next() {
-                    if line.trim() == "BEGIN:VTODO" {
-                        if let Some(todo) = parse_todo(&mut lines) {
-                            todos.push(todo);
-                        }
-                    }
-                }
-            }
-        }
+    let cals = list_calendars(&client, &home).await.unwrap();
+
+    for cal in cals {
+      println!("{} {}", cal.name, cal.ctag);
     }
-
-    Ok(todos)
-}
-
-fn parse_todo<B: BufRead>(lines: &mut std::io::Lines<B>) -> Option<VTodo> {
-    let mut todo = VTodo {
-        completed: None,
-        created: None,
-        dtstamp: None,
-        last_modified: None,
-        percent_complete: None,
-        priority: None,
-        sequence: None,
-        status: None,
-        description: None,
-        summary: None,
-        uid: None,
-    };
-
-    while let Some(Ok(line)) = lines.next() {
-        let line = line.trim();
-        if line == "END:VTODO" {
-            return Some(todo);
-        }
-
-        let parts: Vec<&str> = line.splitn(2, ':').collect();
-        if parts.len() == 2 {
-            match parts[0] {
-                "COMPLETED" => todo.completed = Some(parts[1].to_string()),
-                "CREATED" => todo.created = Some(parts[1].to_string()),
-                "DTSTAMP" => todo.dtstamp = Some(parts[1].to_string()),
-                "LAST-MODIFIED" => todo.last_modified = Some(parts[1].to_string()),
-                "PERCENT-COMPLETE" => todo.percent_complete = parts[1].parse().ok(),
-                "PRIORITY" => todo.priority = parts[1].parse().ok(),
-                "SEQUENCE" => todo.sequence = parts[1].parse().ok(),
-                "STATUS" => todo.status = Some(parts[1].to_string()),
-                "DESCRIPTION" => todo.description = Some(parts[1].to_string()),
-                "SUMMARY" => todo.summary = Some(parts[1].to_string()),
-                "UID" => todo.uid = Some(parts[1].to_string()),
-                _ => {}
-            }
-        }
-    }
-
-    None
 }

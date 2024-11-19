@@ -1,0 +1,116 @@
+<?xml version='1.0' encoding='utf-8'?>
+<multistatus
+	xmlns="DAV:"
+	xmlns:C="urn:ietf:params:xml:ns:caldav"
+	xmlns:CS="http://calendarserver.org/ns/">
+	<response>
+		<href>/liamsnow03/</href>
+		<propstat>
+			<prop>
+				<displayname />
+				<C:supported-calendar-component-set />
+				<CS:getctag />
+			</prop>
+			<status>HTTP/1.1 404 Not Found</status>
+		</propstat>
+	</response>
+	<response>
+		<href>/liamsnow03/general/</href>
+		<propstat>
+			<prop>
+				<displayname>General</displayname>
+				<C:supported-calendar-component-set>
+					<C:comp name="VEVENT" />
+					<C:comp name="VJOURNAL" />
+					<C:comp name="VTODO" />
+				</C:supported-calendar-component-set>
+				<CS:getctag>"dd81bd4a3db3e5ab872b79d049467781e035c4a69b73d5ef0d8fb7b6b74c5a31"</CS:getctag>
+			</prop>
+			<status>HTTP/1.1 200 OK</status>
+		</propstat>
+	</response>
+	<response>
+		<href>/liamsnow03/school/</href>
+		<propstat>
+			<prop>
+				<displayname>School</displayname>
+				<C:supported-calendar-component-set>
+					<C:comp name="VEVENT" />
+					<C:comp name="VJOURNAL" />
+					<C:comp name="VTODO" />
+				</C:supported-calendar-component-set>
+				<CS:getctag>"8216678a428766e55df995b113ba07c256e51edbac42484f0e28104015295307"</CS:getctag>
+			</prop>
+			<status>HTTP/1.1 200 OK</status>
+		</propstat>
+	</response>
+	<response>
+		<href>/liamsnow03/shopping/</href>
+		<propstat>
+			<prop>
+				<displayname>Shopping</displayname>
+				<C:supported-calendar-component-set>
+					<C:comp name="VTODO" />
+				</C:supported-calendar-component-set>
+				<CS:getctag>"8c493542a7c40df8029034370af788d42fac8b6434ed2b0b5c7fa6f66ef2fb07"</CS:getctag>
+			</prop>
+			<status>HTTP/1.1 200 OK</status>
+		</propstat>
+	</response>
+	<response>
+		<href>/liamsnow03/contacts/</href>
+		<propstat>
+			<prop>
+				<displayname>Contacts</displayname>
+				<C:supported-calendar-component-set>
+					<C:comp name="VTODO" />
+					<C:comp name="VEVENT" />
+					<C:comp name="VJOURNAL" />
+				</C:supported-calendar-component-set>
+				<CS:getctag>"0cc1307060b84cff5c2faa27244b70e4c837505b3665eb8f9976f74bffa2cf1f"</CS:getctag>
+			</prop>
+			<status>HTTP/1.1 200 OK</status>
+		</propstat>
+	</response>
+	<response>
+		<href>/liamsnow03/CD74B971-AF41-4C31-A73B-A49ACA2480F3/</href>
+		<propstat>
+			<prop>
+				<displayname>Arch</displayname>
+				<C:supported-calendar-component-set>
+					<C:comp name="VTODO" />
+				</C:supported-calendar-component-set>
+				<CS:getctag>"c840ea1da35ac4020107b2b2963d3db754acc1beaf9d9b0881e1ab553b9540f9"</CS:getctag>
+			</prop>
+			<status>HTTP/1.1 200 OK</status>
+		</propstat>
+	</response>
+	<response>
+		<href>/liamsnow03/0C49DE16-4A6E-4C66-9CA7-D18DA2774059/</href>
+		<propstat>
+			<prop>
+				<displayname>Temp</displayname>
+				<C:supported-calendar-component-set>
+					<C:comp name="VTODO" />
+				</C:supported-calendar-component-set>
+				<CS:getctag>"d91e8e8a0837d2bda47273ef0d877b88f2bfee892abe5ce5d41a67fb8023dec5"</CS:getctag>
+			</prop>
+			<status>HTTP/1.1 200 OK</status>
+		</propstat>
+	</response>
+	<response>
+		<href>/liamsnow03/canvas/</href>
+		<propstat>
+			<prop>
+				<displayname>Canvas</displayname>
+				<C:supported-calendar-component-set>
+					<C:comp name="VEVENT" />
+					<C:comp name="VJOURNAL" />
+					<C:comp name="VTODO" />
+				</C:supported-calendar-component-set>
+				<CS:getctag>"694e1875d3e0774c88210aa8a4b04b80edbf4ec2e644dddee8182aa8c881bb54"</CS:getctag>
+			</prop>
+			<status>HTTP/1.1 200 OK</status>
+		</propstat>
+	</response>
+</multistatus>
