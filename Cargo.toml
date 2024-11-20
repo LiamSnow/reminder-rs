@@ -5,8 +5,10 @@ edition = "2021"
 
 [dependencies]
 base64 = "0.22.1"
+chrono = "0.4.38"
 clap = { version = "4.5.15", features = ["derive"] }
 minidom = "0.16.0"
+peg = "0.8.4"
 reqwest = { version = "0.12.6", features = ["json"] }
 strfmt = "0.2.4"
 tokio = { version = "1.39.3", features = ["full"] }
