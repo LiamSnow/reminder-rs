@@ -15,30 +15,43 @@ pub struct ReminderArgs {
 pub enum ReminderSubcommands {
     /// Open TUI
     Interactive(InteractiveCommand),
+
+    /// List calendars
+    Calendars(CalendarsCommand),
+
     /// Create new reminder in TUI or with arguments
     New(NewCommand),
+    /// Edit reminder in TUI or with args
+    Edit(EditCommand),
+    /// Copy a reminder and edit in TUI or with args
+    Copy(CopyCommand),
     /// Import .ics file
     Import(ImportCommand),
+
     /// Print all reminders at for a date or date range (default today)
     List(ListCommand),
     /// Grep for a reminder
     Grep(GrepCommand),
-    /// New command but with an existing reminder as a template
-    Copy(CopyCommand),
     /// Move reminder(s) to another calendar
     Move(MoveCommand),
+
     /// Mark reminder(s) as cancelled
     Cancel(ActionCommand),
-    /// Edit reminder in TUI
-    Edit(EditCommand),
     /// Delete reminder(s). This is PERMANENT.
     Delete(ActionCommand),
     /// Mark reminder(s) as done
     Done(ActionCommand),
+
     /// Show all info about reminder(s)
     Info(ActionCommand),
+
     /// TODO Remove
     Test(TestCommand)
+}
+
+#[derive(Debug, Args)]
+pub struct CalendarsCommand {
+
 }
 
 #[derive(Debug, Args)]

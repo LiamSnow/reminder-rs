@@ -1,4 +1,4 @@
-use super::peg::parser;
+use super::parser;
 
 
 /*  RFC2445 4.6.2
@@ -45,8 +45,7 @@ pub struct VTodo {
 
 impl VTodo {
     pub fn deserialize(ical_str: String, etag: String) -> Option<Self> {
-        let tree = parser::element(&ical_str).unwrap();
-        let vcal = tree.expect_block("VCALENDAR")?;
+        let vcal = parser::parse(&ical_str).unwrap();
         if vcal.find_param("VERSION")?.value != "2.0" {
             return None;
         }

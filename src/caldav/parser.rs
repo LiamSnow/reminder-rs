@@ -40,14 +40,14 @@ pub fn parse_todo_report(el: &Element) -> Option<VTodo> {
     let prop = follow_tree(el, "propstat.prop", NS_D)?;
     let etag = prop.get_child("getetag", NS_D)?.text();
     let data = prop.get_child("calendar-data", NS_C)?.text();
-    println!("\n***\n{data}***\n");
+    // println!("\n***\n{data}***\n");
     let a = VTodo::deserialize(data, etag);
 
-    if let Some(ref aa) = a {
-        if let Some(ref s) = aa.summary {
-            println!("|||{s}|||");
-        }
-    }
+    // if let Some(ref aa) = a {
+    //     if let Some(ref s) = aa.summary {
+    //         println!("|||{s}|||");
+    //     }
+    // }
 
     a
 }
