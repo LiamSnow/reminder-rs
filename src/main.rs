@@ -2,7 +2,9 @@ mod caldav;
 mod ical;
 mod args;
 
+use args::*;
 use caldav::client::CalDAVClient;
+use clap::Parser;
 
 #[tokio::main]
 async fn main() {
@@ -12,17 +14,22 @@ async fn main() {
         ""
     ).await.unwrap();
 
-    for cal in &client.calendars {
-        println!("-- {} --", cal.name);
-        let todos = client.get_todos(&cal.url).await;
-        // for todo in todos {
-        //     if let Some(s) = todo.summary {
-        //         let is_not_complete = todo.percent.as_ref().map_or(true, |p| p != "100");
-        //         if is_not_complete {
-        //             println!("{}", s);
-        //         }
-        //     }
-        // }
-        println!("{}", todos.len());
+    let args = ReminderArgs::parse();
+
+    match &args.subcommand {
+        ReminderSubcommands::Calendars(_) => {
+            for cal in &client.calendars {
+                println!("{} {}", cal.name, cal.color.clone().unwrap_or("no color".to_string()));
+            }
+        }
+        ReminderSubcommands::List(ListCommand { calendar: calendar_name }) => {
+            let cal = client.get_calendar(calendar_name).unwrap();
+            println!("{} {} {}", cal.name, cal.url, cal.color.clone().unwrap_or("no color".to_string()));
+            let todos = client.get_todos(cal).await;
+            for todo in todos {
+                println!("{}", todo.get_summary().unwrap_or("error".to_string()));
+            }
+        }
+        _ => {}
     }
 }

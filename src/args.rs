@@ -119,7 +119,8 @@ pub struct GrepCommand {
 
 #[derive(Debug, Args)]
 pub struct ListCommand {
-
+    #[arg(short, long)]
+    pub calendar: String,
 }
 
 #[derive(Debug, Args)]
