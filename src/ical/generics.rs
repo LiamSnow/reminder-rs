@@ -90,12 +90,12 @@ impl CalendarComponent {
         })
     }
 
-    pub fn get_property_value(&self, name: &str) -> Option<String> {
-        let p = self.find_property(&name)?;
-        Some(p.value.clone())
+    pub fn get_property_value(&self, name: &str) -> Option<&str> {
+        let prop = self.find_property(&name)?;
+        Some(&prop.value)
     }
 
-    pub fn get_property_value_date(&self, name: &str) -> Option<String> {
+    pub fn get_property_value_date(&self, name: &str) -> Option<&str> {
         self.get_property_value(name)
         // DateTime::parse_from_rfc3339(datetime_str)
     }

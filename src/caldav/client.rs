@@ -47,15 +47,25 @@ impl CalDAVClient {
     ) -> Option<String> {
         let res = self
             .client
-            .request(method, self.base_url.to_string() + &path)
+            .request(method.clone(), self.base_url.to_string() + &path)
             .header("Depth", depth)
             .header(CONTENT_TYPE, "application/xml")
             .basic_auth(&self.username, Some(&self.password))
-            .body(body)
+            .body(body.clone())
             .send()
             .await
             .ok()?;
-        res.text().await.ok()
+        let text_opt = res.text().await.ok();
+
+        //TODO remove this? (so the body clone can be removed)
+        if let Some(text) = &text_opt {
+            if text == "Bad Request" {
+                panic!("Bad Request!\nMethod = {}\nPath = {}\nDepth = {}\nBody = {}\n",
+                    method, path, depth, body);
+            }
+        }
+
+        text_opt
     }
 
     async fn propfind(&self, path: &str, depth: i32, body: &str) -> Option<Element> {
@@ -103,6 +113,7 @@ impl CalDAVClient {
                 <cs:getctag />
                 <c:calendar-description />
                 <i:calendar-color />
+                <d:resourcetype />
             </d:prop>
         "#;
         let root = self.propfind(&self.home, 1, body).await.unwrap();
@@ -113,19 +124,19 @@ impl CalDAVClient {
         self.calendars = cals;
     }
 
-    pub async fn get_todos(&self, cal: &Calendar) -> Vec<CalendarTodo> {
-        let body = r#"
+    async fn get_todos(&self, cal: &Calendar, filter: &str) -> Vec<CalendarTodo> {
+        let body = format!(r#"
             <d:prop>
                 <d:getetag />
                 <c:calendar-data />
             </d:prop>
             <c:filter>
                 <c:comp-filter name="VCALENDAR">
-                    <c:comp-filter name="VTODO" />
+                    {filter}
                 </c:comp-filter>
             </c:filter>
-        "#;
-        if let Some(root) = self.calquery(&cal.url, 1, body).await {
+        "#);
+        if let Some(root) = self.calquery(&cal.url, 1, &body).await {
             root.children()
                 .filter_map(|response| parse_todo_report(response))
                 .collect()
@@ -135,6 +146,41 @@ impl CalDAVClient {
         }
     }
 
+    pub async fn get_current_todos(&self, cal: &Calendar) -> Vec<CalendarTodo> {
+        let mut g1 = self.get_todos(cal, r#"
+            <c:comp-filter name="VTODO">
+                <c:prop-filter name="PERCENT-COMPLETE">
+                    <c:text-match collation="i;ascii-numeric" negate-condition="yes">100</c:text-match>
+                </c:prop-filter>
+            </c:comp-filter>
+        "#).await;
+        let mut g2 = self.get_todos(cal, r#"
+            <c:comp-filter name="VTODO">
+                <c:prop-filter name="PERCENT-COMPLETE">
+                    <c:is-not-defined/>
+                </c:prop-filter>
+            </c:comp-filter>
+        "#).await;
+        g1.append(&mut g2);
+        g1
+    }
+
+    pub async fn get_past_todos(&self, cal: &Calendar) -> Vec<CalendarTodo> {
+        self.get_todos(cal, r#"
+            <c:comp-filter name="VTODO">
+                <c:prop-filter name="PERCENT-COMPLETE">
+                    <c:text-match collation="i;ascii-numeric">100</c:text-match>
+                </c:prop-filter>
+            </c:comp-filter>
+        "#).await
+    }
+
+    pub async fn get_all_todos(&self, cal: &Calendar) -> Vec<CalendarTodo> {
+        self.get_todos(cal, r#"
+            <c:comp-filter name="VTODO" />
+        "#).await
+    }
+
     pub fn get_calendar(&self, calendar_name: &str) -> Option<&Calendar> {
         for cal in &self.calendars {
             if cal.name == calendar_name {
@@ -142,5 +188,25 @@ impl CalDAVClient {
             }
         }
         None
+    }
+}
+
+impl Calendar {
+    pub fn get_color(&self) -> &str {
+        match &self.color {
+            Some(c) => &c,
+            None => "#ffffff",
+        }
+    }
+
+    pub fn fancy_name(&self) -> String {
+        let color = self.get_color();
+        format!("\x1B[48;2;{};{};{}m  \x1B[0m {}",
+            // Convert hex color to RGB
+            u8::from_str_radix(&color[1..3], 16).unwrap_or(255),
+            u8::from_str_radix(&color[3..5], 16).unwrap_or(255),
+            u8::from_str_radix(&color[5..7], 16).unwrap_or(255),
+            self.name
+        )
     }
 }

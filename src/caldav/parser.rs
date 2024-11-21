@@ -27,30 +27,36 @@ pub fn parse_cal_propfind(el: &Element) -> Option<Calendar> {
     let prop = follow_tree(el, "propstat.prop", NS_D)?;
     let name = prop.get_child("displayname", NS_D)?.text();
     let ctag = prop.get_child("getctag", NS_CS)?.text();
-    let supports_todo = prop
-        .get_child("supported-calendar-component-set", NS_C)?
-        .nodes()
-        .filter_map(|node| node.as_element())
-        .any(|elem| {
-            elem.attr("name")
-                .map_or(false, |name| name.contains("VTODO"))
-        });
     let color = prop
         .get_child("calendar-color", NS_I)
         .and_then(|c| Some(c.text()));
     let description = prop
         .get_child("calendar-description", NS_C)
         .and_then(|c| Some(c.text()));
-    match supports_todo {
-        true => Some(Calendar {
-            url,
-            name,
-            ctag,
-            color,
-            description,
-        }),
-        false => None,
+
+    let supports_todo = prop
+        .get_child("supported-calendar-component-set", NS_C)?
+        .nodes()
+        .filter_map(|node| node.as_element()?.attr("name"))
+        .any(|name| name.contains("VTODO"));
+
+    let is_calendar = prop
+        .get_child("resourcetype", NS_D)?
+        .nodes()
+        .filter_map(|node| node.as_element())
+        .any(|elem| elem.name() == "calendar");
+
+    if !supports_todo || !is_calendar {
+        return None;
     }
+
+    Some(Calendar {
+        url,
+        name,
+        ctag,
+        color,
+        description,
+    })
 }
 
 pub fn parse_todo_report(el: &Element) -> Option<CalendarTodo> {
