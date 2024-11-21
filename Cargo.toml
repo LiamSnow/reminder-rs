@@ -8,10 +8,10 @@ base64 = "0.22.1"
 chrono = "0.4.38"
 clap = { version = "4.5.15", features = ["derive"] }
 minidom = "0.16.0"
-peg = "0.8.4"
 regex = "1.11.1"
 reqwest = { version = "0.12.6", features = ["json"] }
 strfmt = "0.2.4"
 tokio = { version = "1.39.3", features = ["full"] }
 url = "2.5.2"
 lazy_static = "1.5.0"
+unicode-segmentation = "1.10.1"

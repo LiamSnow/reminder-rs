@@ -1,4 +1,4 @@
-use crate::ical::vtodo::VTodo;
+use crate::ical::todo::CalendarTodo;
 
 use super::parser::{follow_tree, format_ns_attrs, parse_cal_propfind, parse_todo_report, NS_D};
 use minidom::Element;
@@ -9,6 +9,8 @@ pub struct Calendar {
     pub url: String,
     pub name: String,
     pub ctag: String,
+    pub description: Option<String>,
+    pub color: Option<String>
 }
 
 pub struct CalDAVClient {
@@ -99,6 +101,8 @@ impl CalDAVClient {
                 <d:displayname />
                 <c:supported-calendar-component-set />
                 <cs:getctag />
+                <c:calendar-description />
+                <i:calendar-color />
             </d:prop>
         "#;
         let root = self.propfind(&self.home, 1, body).await.unwrap();
@@ -109,7 +113,7 @@ impl CalDAVClient {
         self.calendars = cals;
     }
 
-    pub async fn get_todos(&self, path: &str) -> Vec<VTodo> {
+    pub async fn get_todos(&self, cal: &Calendar) -> Vec<CalendarTodo> {
         let body = r#"
             <d:prop>
                 <d:getetag />
@@ -121,7 +125,7 @@ impl CalDAVClient {
                 </c:comp-filter>
             </c:filter>
         "#;
-        if let Some(root) = self.calquery(path, 1, body).await {
+        if let Some(root) = self.calquery(&cal.url, 1, body).await {
             root.children()
                 .filter_map(|response| parse_todo_report(response))
                 .collect()
@@ -129,5 +133,14 @@ impl CalDAVClient {
         else {
             vec![]
         }
+    }
+
+    pub fn get_calendar(&self, calendar_name: &str) -> Option<&Calendar> {
+        for cal in &self.calendars {
+            if cal.name == calendar_name {
+                return Some(&cal);
+            }
+        }
+        None
     }
 }
