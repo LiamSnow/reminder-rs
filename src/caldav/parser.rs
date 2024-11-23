@@ -40,6 +40,7 @@ pub fn parse_cal_propfind(el: &Element) -> Option<Calendar> {
         .filter_map(|node| node.as_element()?.attr("name"))
         .any(|name| name.contains("VTODO"));
 
+    //unclear why addressbook's say they support VTODO but idk
     let is_calendar = prop
         .get_child("resourcetype", NS_D)?
         .nodes()
@@ -50,13 +51,7 @@ pub fn parse_cal_propfind(el: &Element) -> Option<Calendar> {
         return None;
     }
 
-    Some(Calendar {
-        url,
-        name,
-        ctag,
-        color,
-        description,
-    })
+    Some(Calendar::new(url, name, ctag, color, description))
 }
 
 pub fn parse_todo_report(el: &Element) -> Option<CalendarTodo> {

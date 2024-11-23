@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::ical::todo::CalendarTodo;
 
 use super::parser::{follow_tree, format_ns_attrs, parse_cal_propfind, parse_todo_report, NS_D};
@@ -9,8 +12,10 @@ pub struct Calendar {
     pub url: String,
     pub name: String,
     pub ctag: String,
+    pub color: Option<String>,
     pub description: Option<String>,
-    pub color: Option<String>
+    cache_current_todos: Rc<Vec<CalendarTodo>>,
+    cache_past_todos: Rc<Vec<CalendarTodo>>,
 }
 
 pub struct CalDAVClient {
@@ -19,8 +24,19 @@ pub struct CalDAVClient {
     username: String,
     password: String,
     pub home: String,
-    pub calendars: Vec<Calendar>
+    pub calendars: Vec<RefCell<Calendar>>,
 }
+
+const CALENDAR_PROPS: &str = r#"
+    <d:prop>
+        <d:displayname />
+        <c:supported-calendar-component-set />
+        <cs:getctag />
+        <c:calendar-description />
+        <i:calendar-color />
+        <d:resourcetype />
+    </d:prop>
+"#;
 
 impl CalDAVClient {
     pub async fn new(base_url: &str, username: &str, password: &str) -> Option<Self> {
@@ -30,11 +46,11 @@ impl CalDAVClient {
             username: username.to_string(),
             password: password.to_string(),
             home: "".to_string(),
-            calendars: vec![]
+            calendars: vec![],
         };
         let principal = c.get_principal().await?;
         c.home = c.get_homeset(&principal).await?;
-        c.refresh_calendars().await;
+        c.calendars = c.get_calendars().await;
         Some(c)
     }
 
@@ -60,8 +76,10 @@ impl CalDAVClient {
         //TODO remove this? (so the body clone can be removed)
         if let Some(text) = &text_opt {
             if text == "Bad Request" {
-                panic!("Bad Request!\nMethod = {}\nPath = {}\nDepth = {}\nBody = {}\n",
-                    method, path, depth, body);
+                panic!(
+                    "Bad Request!\nMethod = {}\nPath = {}\nDepth = {}\nBody = {}\n",
+                    method, path, depth, body
+                );
             }
         }
 
@@ -105,27 +123,28 @@ impl CalDAVClient {
         Some(follow_tree(&root, "response.href", NS_D)?.text())
     }
 
-    pub async fn refresh_calendars(&mut self) {
-        let body = r#"
-            <d:prop>
-                <d:displayname />
-                <c:supported-calendar-component-set />
-                <cs:getctag />
-                <c:calendar-description />
-                <i:calendar-color />
-                <d:resourcetype />
-            </d:prop>
-        "#;
-        let root = self.propfind(&self.home, 1, body).await.unwrap();
-        let cals: Vec<Calendar> = root
+    async fn get_calendars(&self) -> Vec<RefCell<Calendar>> {
+        let root = self.propfind(&self.home, 1, CALENDAR_PROPS).await.unwrap();
+        let cals: Vec<RefCell<Calendar>> = root
             .children()
-            .filter_map(|response| parse_cal_propfind(response))
+            .filter_map(|response| Some(RefCell::new(parse_cal_propfind(response)?)))
             .collect();
-        self.calendars = cals;
+        cals
+    }
+
+    async fn refresh_calendar(&self, cal_ref: &RefCell<Calendar>) -> bool {
+        let root = self.propfind(&self.home, 1, CALENDAR_PROPS).await.unwrap();
+        let new_calendar = parse_cal_propfind(root.children().next().expect("Refresh calendar failed!")).expect("Calendar is gone!");
+        if new_calendar.ctag != cal_ref.borrow().ctag {
+            *cal_ref.borrow_mut() = new_calendar;
+            return true;
+        }
+        false
     }
 
     async fn get_todos(&self, cal: &Calendar, filter: &str) -> Vec<CalendarTodo> {
-        let body = format!(r#"
+        let body = format!(
+            r#"
             <d:prop>
                 <d:getetag />
                 <c:calendar-data />
@@ -135,56 +154,74 @@ impl CalDAVClient {
                     {filter}
                 </c:comp-filter>
             </c:filter>
-        "#);
+        "#
+        );
         if let Some(root) = self.calquery(&cal.url, 1, &body).await {
             root.children()
                 .filter_map(|response| parse_todo_report(response))
                 .collect()
-        }
-        else {
+        } else {
             vec![]
         }
     }
 
-    pub async fn get_current_todos(&self, cal: &Calendar) -> Vec<CalendarTodo> {
-        let mut g1 = self.get_todos(cal, r#"
+    pub async fn get_current_todos(&self, cal_ref: &RefCell<Calendar>) -> Rc<Vec<CalendarTodo>> {
+        //have cache & ctag did not change => use cache
+        if cal_ref.borrow().cache_current_todos.len() > 0 && !self.refresh_calendar(cal_ref).await {
+            //TODO check ctag
+            return cal_ref.borrow().cache_current_todos.clone();
+        }
+
+        let mut todos1 = self.get_todos(&cal_ref.borrow(), r#"
             <c:comp-filter name="VTODO">
                 <c:prop-filter name="PERCENT-COMPLETE">
                     <c:text-match collation="i;ascii-numeric" negate-condition="yes">100</c:text-match>
                 </c:prop-filter>
             </c:comp-filter>
         "#).await;
-        let mut g2 = self.get_todos(cal, r#"
+        let mut todos2 = self
+            .get_todos(
+                &cal_ref.borrow(),
+                r#"
             <c:comp-filter name="VTODO">
                 <c:prop-filter name="PERCENT-COMPLETE">
                     <c:is-not-defined/>
                 </c:prop-filter>
             </c:comp-filter>
-        "#).await;
-        g1.append(&mut g2);
-        g1
+        "#,
+            )
+            .await;
+        todos1.append(&mut todos2);
+        cal_ref.borrow_mut().cache_current_todos = todos1.into();
+        cal_ref.borrow().cache_current_todos.clone()
     }
 
-    pub async fn get_past_todos(&self, cal: &Calendar) -> Vec<CalendarTodo> {
-        self.get_todos(cal, r#"
+    pub async fn get_past_todos(&self, cal_ref: &RefCell<Calendar>) -> Rc<Vec<CalendarTodo>> {
+        //have cache & ctag did not change => use cache
+        if cal_ref.borrow().cache_past_todos.len() > 0  && !self.refresh_calendar(cal_ref).await {
+            return cal_ref.borrow().cache_past_todos.clone();
+        }
+
+        let todos = self.get_todos(
+            &cal_ref.borrow(),
+            r#"
             <c:comp-filter name="VTODO">
                 <c:prop-filter name="PERCENT-COMPLETE">
                     <c:text-match collation="i;ascii-numeric">100</c:text-match>
                 </c:prop-filter>
             </c:comp-filter>
-        "#).await
+        "#,
+        )
+        .await;
+
+        cal_ref.borrow_mut().cache_past_todos = todos.into();
+        cal_ref.borrow().cache_past_todos.clone()
     }
 
-    pub async fn get_all_todos(&self, cal: &Calendar) -> Vec<CalendarTodo> {
-        self.get_todos(cal, r#"
-            <c:comp-filter name="VTODO" />
-        "#).await
-    }
-
-    pub fn get_calendar(&self, calendar_name: &str) -> Option<&Calendar> {
+    pub fn get_calendar(&self, name: &str) -> Option<&RefCell<Calendar>> {
         for cal in &self.calendars {
-            if cal.name == calendar_name {
-                return Some(&cal);
+            if cal.borrow().name == name {
+                return Some(cal);
             }
         }
         None
@@ -192,6 +229,24 @@ impl CalDAVClient {
 }
 
 impl Calendar {
+    pub fn new(
+        url: String,
+        name: String,
+        ctag: String,
+        color: Option<String>,
+        description: Option<String>,
+    ) -> Self {
+        Calendar {
+            url,
+            name,
+            ctag,
+            color,
+            description,
+            cache_current_todos: Rc::new(vec![]),
+            cache_past_todos: Rc::new(vec![]),
+        }
+    }
+
     pub fn get_color(&self) -> &str {
         match &self.color {
             Some(c) => &c,
@@ -201,7 +256,8 @@ impl Calendar {
 
     pub fn fancy_name(&self) -> String {
         let color = self.get_color();
-        format!("\x1B[48;2;{};{};{}m  \x1B[0m {}",
+        format!(
+            "\x1B[48;2;{};{};{}m  \x1B[0m {}",
             // Convert hex color to RGB
             u8::from_str_radix(&color[1..3], 16).unwrap_or(255),
             u8::from_str_radix(&color[3..5], 16).unwrap_or(255),

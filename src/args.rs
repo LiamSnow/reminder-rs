@@ -28,10 +28,10 @@ pub enum ReminderSubcommands {
     /// Import .ics file
     Import(ImportCommand),
 
-    /// Print all reminders at for a date or date range (default today)
+    /// Print all incomplete reminders
     List(ListCommand),
-    /// Grep for a reminder
-    Grep(GrepCommand),
+    /// Search for a reminder
+    Search(SearchCommand),
     /// Move reminder(s) to another calendar
     Move(MoveCommand),
 
@@ -104,7 +104,8 @@ pub struct NewCommand {
 
 #[derive(Debug, Args)]
 pub struct ImportCommand {
-
+    #[arg(short, long)]
+    pub calendar: String,
 }
 
 #[derive(Debug, Args)]
@@ -113,8 +114,11 @@ pub struct CopyCommand {
 }
 
 #[derive(Debug, Args)]
-pub struct GrepCommand {
-
+pub struct SearchCommand {
+    #[arg(short, long)]
+    pub calendar: Option<String>,
+    #[arg(required = true)]
+    pub term: String,
 }
 
 #[derive(Debug, Args)]

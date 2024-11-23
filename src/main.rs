@@ -1,10 +1,13 @@
-mod caldav;
-mod ical;
-mod args;
+use std::cell::RefCell;
 
 use args::*;
 use caldav::client::{CalDAVClient, Calendar};
 use clap::Parser;
+
+mod caldav;
+mod ical;
+mod args;
+mod tui;
 
 #[tokio::main]
 async fn main() {
@@ -17,9 +20,13 @@ async fn main() {
     let args = ReminderArgs::parse();
 
     match &args.subcommand {
+        ReminderSubcommands::Interactive(..) => {
+            tui::start(client);
+        }
         ReminderSubcommands::Calendars(_) => {
-            for cal in &client.calendars {
-                println!("{} {}", cal.name, cal.color.clone().unwrap_or("no color".to_string()));
+            for cal_ref in &client.calendars {
+                let cal = cal_ref.borrow();
+                println!("{}", cal.fancy_name());
             }
         }
         ReminderSubcommands::List(ListCommand { calendar: calendar_name_opt }) => {
@@ -30,7 +37,20 @@ async fn main() {
                 },
                 None => {
                     for cal in &client.calendars {
-                        print_todos(&client, &cal).await;
+                        print_todos(&client, cal).await;
+                    }
+                },
+            }
+        }
+        ReminderSubcommands::Search(SearchCommand { calendar: calendar_name_opt, term }) => {
+            match calendar_name_opt {
+                Some(calendar_name) => {
+                    let cal = client.get_calendar(calendar_name).unwrap();
+                    search_todos(&client, cal, term).await;
+                },
+                None => {
+                    for cal in &client.calendars {
+                        search_todos(&client, cal, term).await;
                     }
                 },
             }
@@ -39,12 +59,30 @@ async fn main() {
     }
 }
 
-async fn print_todos(client: &CalDAVClient, cal: &Calendar) {
-    println!("Todos for {}", cal.fancy_name());
+async fn search_todos(client: &CalDAVClient, cal_ref: &RefCell<Calendar>, term: &str) {
+    let mut has_printed = false;
+    let todos = client.get_current_todos(cal_ref).await;
+    for todo in todos.as_ref() {
+        let summary = todo.get_summary().unwrap_or("");
+        if summary.contains(term) {
+            if !has_printed {
+                println!("Todos for {}", cal_ref.borrow().fancy_name());
+                has_printed = true;
+            }
+            println!("{summary}");
+        }
+    }
+}
 
-    let todos = client.get_current_todos(cal).await;
-    for todo in todos {
+async fn print_todos(client: &CalDAVClient, cal_ref: &RefCell<Calendar>) {
+    println!("Todos for {}", cal_ref.borrow().fancy_name());
+
+    let todos = client.get_current_todos(&cal_ref).await;
+    for todo in todos.as_ref() {
         let summary = todo.get_summary().unwrap_or("Error");
         println!("{summary}");
     }
 }
+
+
+

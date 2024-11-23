@@ -35,66 +35,66 @@ impl CalendarTodo {
     }
 
     //single mentions
-    pub fn get_class(&self) -> Option<&str> {
+    pub fn get_class(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("CLASS")
     }
-    pub fn get_completed(&self) -> Option<&str> {
+    pub fn get_completed(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("COMPLETED")
     }
-    pub fn get_created(&self) -> Option<&str> {
+    pub fn get_created(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("CREATED")
     }
-    pub fn get_description(&self) -> Option<&str> {
+    pub fn get_description(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("DESCRIPTION")
     }
-    pub fn get_dtstamp(&self) -> Option<&str> {
+    pub fn get_dtstamp(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("DTSTAMP")
     }
-    pub fn get_dtstart(&self) -> Option<&str> {
+    pub fn get_dtstart(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("DTSTART")
     }
-    pub fn get_geo(&self) -> Option<&str> {
+    pub fn get_geo(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("GEO")
     }
-    pub fn get_last_modified(&self) -> Option<&str> {
+    pub fn get_last_modified(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("LAST-MODIFIED")
     }
-    pub fn get_location(&self) -> Option<&str> {
+    pub fn get_location(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("LOCATION")
     }
-    pub fn get_organizer(&self) -> Option<&str> {
+    pub fn get_organizer(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("ORGANIZER")
     }
-    pub fn get_percent(&self) -> Option<&str> {
+    pub fn get_percent(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("PERCENT-COMPLETE")
     }
-    pub fn get_priority(&self) -> Option<&str> {
+    pub fn get_priority(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("PRIORITY")
     }
-    pub fn get_recurid(&self) -> Option<&str> {
+    pub fn get_recurid(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("RECURID")
     }
-    pub fn get_seq(&self) -> Option<&str> {
+    pub fn get_seq(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("SEQ")
     }
-    pub fn get_status(&self) -> Option<&str> {
+    pub fn get_status(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("STATUS")
     }
-    pub fn get_summary(&self) -> Option<&str> {
+    pub fn get_summary(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("SUMMARY")
     }
-    pub fn get_uid(&self) -> Option<&str> {
+    pub fn get_uid(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("UID")
     }
-    pub fn get_url(&self) -> Option<&str> {
+    pub fn get_url(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("URL")
     }
 
     //one or other mentions
-    pub fn get_due(&self) -> Option<&str> {
+    pub fn get_due(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("DUE")
     }
-    pub fn get_duration(&self) -> Option<&str> {
+    pub fn get_duration(&self) -> Option<String> {
         self.get_vtodo()?.get_property_value("DURATION")
     }
 
