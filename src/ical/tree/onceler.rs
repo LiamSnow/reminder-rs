@@ -1,16 +1,15 @@
 use unicode_segmentation::UnicodeSegmentation;
-
-use super::generics::{CalendarComponent, CalendarObject, CalendarProperty};
+use super::types::{TreeComponent, TreeObject, TreeProperty};
 
 const CRLF: &str = "\r\n";
 
-pub fn serialize(vcal: &CalendarComponent) -> String {
+pub fn serialize(vcal: &TreeComponent) -> String {
     let mut ics = String::new();
     serialize_component(&mut ics, vcal);
     ics
 }
 
-pub fn serialize_component(ics: &mut String, comp: &CalendarComponent) {
+pub fn serialize_component(ics: &mut String, comp: &TreeComponent) {
     if ics.len() != 0 {
         ics.push_str(CRLF);
     }
@@ -18,8 +17,8 @@ pub fn serialize_component(ics: &mut String, comp: &CalendarComponent) {
     ics.push_str(&comp.name);
     for child in &comp.children {
         match child {
-            CalendarObject::Component(child) => serialize_component(ics, child),
-            CalendarObject::Property(child) => serialize_property(ics, child),
+            TreeObject::Component(child) => serialize_component(ics, child),
+            TreeObject::Property(child) => serialize_property(ics, child),
         }
     }
     ics.push_str(CRLF);
@@ -32,7 +31,7 @@ excluding the line break. Long content lines SHOULD be split into a
 multiple line representations using a line "folding" technique. That
 is, a long line can be split between any two characters by inserting
 a CRLF immediately followed by a single linear white-space character */
-pub fn serialize_property(ics: &mut String, prop: &CalendarProperty) {
+pub fn serialize_property(ics: &mut String, prop: &TreeProperty) {
     let line = prop.name.clone() + ":" + &prop.value;
     let graphemes = line.graphemes(true); //properly handle unicode
     let end = graphemes.clone().count() - 1;
@@ -62,7 +61,7 @@ mod tests {
     fn test_serialize_property_line_fold() {
         let name = "EXAMPLE".to_string();
         let value = "This is a really long line. ".repeat(20);
-        let prop = CalendarProperty { name, value };
+        let prop = TreeProperty { name, value };
         let mut ics = String::new();
         serialize_property(&mut ics, &prop);
         for line in ics.lines() {

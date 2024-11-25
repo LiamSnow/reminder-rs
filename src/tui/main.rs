@@ -22,7 +22,7 @@ pub fn start(client: CalDAVClient) -> Result<(), Box<dyn Error>> {
     let backend = CrosstermBackend::new(stderr);
     let mut terminal = Terminal::new(backend)?;
     let mut app = App::new(client);
-    let res = run_app(&mut terminal, &mut app);
+    // let res = run_app(&mut terminal, &mut app);
 
     //restore
     disable_raw_mode()?;
@@ -36,11 +36,11 @@ pub fn start(client: CalDAVClient) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<bool> {
-    loop {
-        terminal.draw(|f| ui(f, app))?;
-        if let Event::Key(key) = event::read()? {
-            dbg!(key.code)
-        }
-    }
-}
+// fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<bool> {
+//     loop {
+//         terminal.draw(|f| ui(f, app))?;
+//         if let Event::Key(key) = event::read()? {
+//             dbg!(key.code)
+//         }
+//     }
+// }

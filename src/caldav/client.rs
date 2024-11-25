@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::ical::todo::CalendarTodo;
+use crate::ical::components::todo::CalendarTodo;
 
 use super::parser::{follow_tree, format_ns_attrs, parse_cal_propfind, parse_todo_report, NS_D};
 use minidom::Element;

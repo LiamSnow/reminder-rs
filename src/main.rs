@@ -1,5 +1,5 @@
-use std::cell::RefCell;
-
+use std::{cell::RefCell, env};
+use dotenv::dotenv;
 use args::*;
 use caldav::client::{CalDAVClient, Calendar};
 use clap::Parser;
@@ -11,17 +11,18 @@ mod tui;
 
 #[tokio::main]
 async fn main() {
-    let client = CalDAVClient::new(
-        "",
-        "",
-        ""
-    ).await.unwrap();
+    dotenv().ok();
+    let base_url = env::var("CALDAV_URL").unwrap();
+    let username = env::var("CALDAV_USERNAME").unwrap();
+    let password = env::var("CALDAV_PASSWORD").unwrap();
+
+    let client = CalDAVClient::new(&base_url, &username, &password).await.unwrap();
 
     let args = ReminderArgs::parse();
 
     match &args.subcommand {
         ReminderSubcommands::Interactive(..) => {
-            tui::start(client);
+            tui::main::start(client);
         }
         ReminderSubcommands::Calendars(_) => {
             for cal_ref in &client.calendars {

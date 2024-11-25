@@ -28,3 +28,5 @@ Cargo.lock
 /test_calendars_1/
 
 /text.xml
+
+.env
