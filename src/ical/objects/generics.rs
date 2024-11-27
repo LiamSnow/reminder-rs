@@ -4,7 +4,7 @@ use std::{collections::HashMap, error::Error};
 
 use crate::ical::values::{base::ICalValue, string::ICalString};
 
-use super::{valarm::VAlarm, vevent::VEvent, vtodo::VTodo};
+use super::{valarm::VAlarm, vevent::VEvent, vjournal::VJournal, vtodo::VTodo};
 
 pub enum ICalObject {
     UnknownComponent(UnknownComponent),
@@ -12,6 +12,7 @@ pub enum ICalObject {
     VTodo(VTodo),
     VAlarm(VAlarm),
     VEvent(VEvent),
+    VJournal(VJournal)
 }
 
 pub type ICalParameterMap = HashMap<String, String>;
@@ -43,6 +44,7 @@ impl ICalObject {
             ICalObject::VTodo(_) => VTodo::NAME,
             ICalObject::VAlarm(_) => VAlarm::NAME,
             ICalObject::VEvent(_) => VEvent::NAME,
+            ICalObject::VJournal(_) => VJournal::NAME,
         }
     }
 }
@@ -50,3 +52,4 @@ impl ICalObject {
 pub trait Validadable {
     fn validate(&self) -> Result<(), Box<dyn Error>>;
 }
+

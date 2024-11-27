@@ -2,6 +2,7 @@ use crate::ical::objects::generics::ICalParameterMap;
 use std::error::Error;
 
 //Base Value
+#[derive(Clone)]
 pub struct ICalValue<T: ICalValueType> {
     pub value: T,
     pub params: ICalParameterMap,
@@ -25,6 +26,10 @@ impl<T: ICalValueType> ICalValue<T> {
         self.params = params;
         Ok(())
     }
+
+    pub fn get_value(&self) -> &T {
+        &self.value
+    }
 }
 
 //Optional
@@ -34,6 +39,17 @@ impl<T: ICalValueType> ICalOptional<T> {
     pub fn set(&mut self, value: &str, params: ICalParameterMap) -> Result<(), Box<dyn Error>> {
         self.0 = Some(ICalValue::new(value, params)?);
         Ok(())
+    }
+
+    pub fn get(&self) -> Option<&ICalValue<T>> {
+        match &self.0 {
+            Some(value) => Some(value),
+            None => None,
+        }
+    }
+
+    pub fn get_value(&self) -> Option<&T> {
+        self.get().and_then(|v| Some(v.get_value()))
     }
 }
 

@@ -1,8 +1,12 @@
 #![allow(dead_code)]
 
 use crate::ical::values::{base::*, datetime::*, integer::*, string::*, duration::*};
-
 use super::{generics::*, valarm::VAlarm, macros::*};
+use crate::ical::serializer::{self, ICSAble, ICSAbleWithName};
+
+use std::vec::IntoIter;
+use std::error::Error;
+use crate::ical::parser::{Parsable, ContentLine};
 
 make_ical_comp_struct! {
     /// RFC5545 3.6.2 A "VTODO" calendar component is a grouping
@@ -43,15 +47,16 @@ make_ical_comp_struct! {
         rdate Mul DateTime,
         rrule Mul String,
 
-        alarms Vec VAlarm,
-
-        ///Includes 3.8.8.1 IANA Properties and 3.8.8.2 Non-Standard/X-Props
-        unknown Vec ICalObject,
+        alarms Children VAlarm,
     }
 }
 
 impl VTodo {
     pub const NAME: &str = "VTODO";
+
+    pub fn get_all_categories(&self) -> Vec<&str> {
+        todo!()
+    }
 }
 
 impl Validadable for VTodo {

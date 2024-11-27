@@ -7,135 +7,96 @@ use std::vec::IntoIter;
 use super::objects::generics::*;
 use super::objects::valarm::VAlarm;
 use super::objects::vevent::VEvent;
+use super::objects::vjournal::VJournal;
 use super::objects::vtodo::VTodo;
 use super::values::base::ICalValue;
 
-fn parse_component(lines: &mut std::vec::IntoIter<ContentLine>, begin_line: ContentLine) -> Result<ICalObject, Box<dyn Error>> {
-    Ok(match begin_line.value.as_str() {
-        "VTODO" => ICalObject::VTodo(parse_vtodo(lines)?),
-        "VEVENT" => ICalObject::VEvent(parse_vevent(lines)?),
-        "VALARM" => ICalObject::VAlarm(parse_valarm(lines)?),
-        _ => ICalObject::UnknownComponent(parse_unknown_component(lines, begin_line)?)
-    })
+pub trait Parsable
+where
+    Self: Sized,
+{
+    fn parse(lines: &mut IntoIter<ContentLine>, begin_line: ContentLine) -> Result<Self, Box<dyn Error>>;
 }
 
 lazy_static! {
-    /* RFC5545 3.1: a long line can be split between any two characters by
-       inserting a CRLF immediately followed by a single linear white-space
-       character (i.e., SPACE or HTAB) */
     /// Finds the location of all ICal folds
+    ///   RFC5545 3.1: a long line can be split between any two characters by
+    ///   inserting a CRLF immediately followed by a single linear white-space
+    ///   character (i.e., SPACE or HTAB)
     static ref FOLDS: Regex = Regex::new(r"\r?\n[\t ]").unwrap();
 }
 
-pub fn parse(ical_str: &str) -> Result<VCalendar, Box<dyn Error>> {
-    let unfolded_ical_str = FOLDS.replace_all(ical_str, "");
-    let mut lines = unfolded_ical_str
-        .lines()
-        .map(ContentLine::from_str)
-        .collect::<Result<Vec<ContentLine>, String>>()?
-        .into_iter();
+impl VCalendar {
+    pub fn parse(ical_str: &str) -> Result<Self, Box<dyn Error>> {
+        let unfolded_ical_str = FOLDS.replace_all(ical_str, "");
+        let mut lines = unfolded_ical_str
+            .lines()
+            .map(ContentLine::from_str)
+            .collect::<Result<Vec<ContentLine>, String>>()?
+            .into_iter();
 
-    let begin_line = lines.next().ok_or("Error: ICal string is empty!".to_string())?;
-    if begin_line.value == "VCALENDAR" {
-        return Err("Error: ICal string does not start with VCALENDAR component!".into());
-    }
-
-    let mut children: Vec<ICalObject> = vec![];
-    while let Some(line) = lines.next() {
-        match (line.name.as_str(), line.value.as_str()) {
-            ("BEGIN", _) => children.push(parse_component(&mut lines, line)?),
-            ("END", "VCALENDAR") => break,
-            ("END", _) => return Err(format!("Unexpected END in VCALENDAR. Found {}.", line.value).into()),
-            (_, _) => children.push(line.to_unknown_prop_obj()),
+        let begin_line = lines.next().ok_or("Error: ICal string is empty!".to_string())?;
+        if begin_line.name != "BEGIN" || begin_line.value != VCalendar::NAME {
+            return Err(format!("Error: ICal started with {}:{} not BEGIN:VCALENDAR!", begin_line.name, begin_line.value).into());
         }
-    }
-    Ok(VCalendar { children })
-}
 
-fn parse_vtodo(lines: &mut IntoIter<ContentLine>) -> Result<VTodo, Box<dyn Error>> {
-    let mut vtodo = VTodo::default();
-    while let Some(line) = lines.next() {
-        match (line.name.as_str(), line.value.as_str()) {
-            ("BEGIN", "VALARM") => vtodo.alarms.push(parse_valarm(lines)?),
-            ("BEGIN", _) => vtodo.unknown.push(parse_component(lines, line)?),
-            ("END", "VTODO") => break,
-            ("END", _) => return Err(format!("Unexpected END in VCALENDAR. Found {}.", line.value).into()),
-
-            ("UID", value) => vtodo.uid.set(value, line.params)?,
-            ("CLASS", value) => vtodo.class.set(value, line.params)?,
-            ("CLASS", value) => vtodo.class.set(value, line.params)?,
-            ("COMPLETED", value) => vtodo.completed.set(value, line.params)?,
-            ("CREATED", value) => vtodo.created.set(value, line.params)?,
-            ("DESCRIPTION", value) => vtodo.description.set(value, line.params)?,
-            ("DTSTART", value) => vtodo.dtstart.set(value, line.params)?,
-            ("GEO", value) => vtodo.geo.set(value, line.params)?,
-            ("LAST-MODIFIED", value) => vtodo.last_modified.set(value, line.params)?,
-            ("LOCATION", value) => vtodo.location.set(value, line.params)?,
-            ("ORGANIZER", value) => vtodo.organizer.set(value, line.params)?,
-            ("PERCENT-COMPLETE", value) => vtodo.percent_complete.set(value, line.params)?,
-            ("PRIORITY", value) => vtodo.priority.set(value, line.params)?,
-            ("RECURRENCE-ID", value) => vtodo.recurrence_id.set(value, line.params)?,
-            ("SEQUENCE", value) => vtodo.sequence.set(value, line.params)?,
-            ("STATUS", value) => vtodo.status.set(value, line.params)?,
-            ("SUMMARY", value) => vtodo.summary.set(value, line.params)?,
-            ("URL", value) => vtodo.url.set(value, line.params)?,
-            ("DUE", value) => vtodo.due.set(value, line.params)?,
-            ("DURATION", value) => vtodo.duration.set(value, line.params)?,
-
-            ("ATTACH", value) => vtodo.attach.add(value, line.params)?,
-            ("ATTENDEE", value) => vtodo.attendee.add(value, line.params)?,
-            ("CATEGORIES", value) => vtodo.categories.add(value, line.params)?,
-            ("COMMENT", value) => vtodo.comment.add(value, line.params)?,
-            ("CONTACT", value) => vtodo.contact.add(value, line.params)?,
-            ("EXDATE", value) => vtodo.exdate.add(value, line.params)?,
-            ("REQUEST-STATUS", value) => vtodo.request_status.add(value, line.params)?,
-            ("RELATED-TO", value) => vtodo.related_to.add(value, line.params)?,
-            ("RESOURCES", value) => vtodo.resources.add(value, line.params)?,
-            ("RDATE", value) => vtodo.rdate.add(value, line.params)?,
-            ("RRULE", value) => vtodo.rrule.add(value, line.params)?,
-
-            (_, _) => vtodo.unknown.push(line.to_unknown_prop_obj())
+        let mut children: Vec<ICalObject> = vec![];
+        while let Some(line) = lines.next() {
+            match (line.name.as_str(), line.value.as_str()) {
+                ("END", VCalendar::NAME) => break,
+                ("END", _) => return Err(format!("Unexpected END in VCALENDAR. Found {}.", line.value).into()),
+                (_, _) => children.push(ICalObject::parse(&mut lines, line)?),
+            }
         }
+        Ok(Self { children })
     }
-
-    Ok(vtodo)
 }
 
-fn parse_vevent(lines: &mut IntoIter<ContentLine>) -> Result<VEvent, String> {
-    todo!();
-}
-
-fn parse_valarm(lines: &mut IntoIter<ContentLine>) -> Result<VAlarm, String> {
-    todo!();
-}
-
-fn parse_unknown_component(lines: &mut IntoIter<ContentLine>, begin_line: ContentLine) -> Result<UnknownComponent, Box<dyn Error>> {
-    let mut children: Vec<ICalObject> = vec![];
-    let name = begin_line.value.as_str();
-    while let Some(line) = lines.next() {
-        match (line.name.as_str(), line.value.as_str()) {
-            ("BEGIN", _) => children.push(parse_component(lines, line)?),
-            ("END", end_name) => {
-                if end_name == name {
-                    break
-                }
-                return Err(format!("Unexpected END in {}. Found {}.", begin_line.value, line.value).into())
-            },
-            (_, _) => children.push(line.to_unknown_prop_obj())
+impl Parsable for ICalObject {
+    fn parse(lines: &mut IntoIter<ContentLine>, begin_line: ContentLine) -> Result<Self, Box<dyn Error>> {
+        // println!("parsing {} {}", begin_line.value, begin_line.name);
+        if begin_line.name != "BEGIN" {
+            return Ok(begin_line.to_unknown_prop_obj());
         }
+
+        Ok(match begin_line.value.as_str() {
+            VTodo::NAME => ICalObject::VTodo(VTodo::parse(lines, begin_line)?),
+            VEvent::NAME => ICalObject::VEvent(VEvent::parse(lines, begin_line)?),
+            VAlarm::NAME => ICalObject::VAlarm(VAlarm::parse(lines, begin_line)?),
+            VJournal::NAME => ICalObject::VJournal(VJournal::parse(lines, begin_line)?),
+            _ => ICalObject::UnknownComponent(UnknownComponent::parse(lines, begin_line)?)
+        })
     }
-    Ok(UnknownComponent {
-        name: name.to_string(),
-        children,
-        params: begin_line.params
-    })
+}
+
+impl Parsable for UnknownComponent {
+    fn parse(lines: &mut IntoIter<ContentLine>, begin_line: ContentLine) -> Result<Self, Box<dyn Error>> {
+        let mut children: Vec<ICalObject> = vec![];
+        let name = begin_line.value.as_str();
+        while let Some(line) = lines.next() {
+            match (line.name.as_str(), line.value.as_str()) {
+                ("END", end_name) => {
+                    if end_name == name {
+                        break
+                    }
+                    return Err(format!("Unexpected END in {}. Found {}.", begin_line.value, line.value).into())
+                },
+                (_, _) => children.push(ICalObject::parse(lines, line)?),
+            }
+        }
+        Ok(Self {
+            name: name.to_string(),
+            children,
+            params: begin_line.params
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
-struct ContentLine {
-    name: String,
-    params: HashMap<String, String>,
-    value: String,
+pub struct ContentLine {
+    pub name: String,
+    pub params: HashMap<String, String>,
+    pub value: String,
 }
 
 impl ContentLine {
@@ -171,7 +132,7 @@ impl ContentLine {
         Ok((parts[0].to_string(), parts[1].to_string()))
     }
 
-    fn to_unknown_prop_obj(self) -> ICalObject {
+    pub fn to_unknown_prop_obj(self) -> ICalObject {
         ICalObject::UnknownProperty(UnknownProperty {
             name: self.name,
             value: ICalValue {

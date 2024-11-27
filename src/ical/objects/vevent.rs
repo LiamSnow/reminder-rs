@@ -1,9 +1,14 @@
 use crate::ical::values::{base::*, integer::*, string::*, duration::*, datetime::*};
 
 use super::{generics::*, macros::*};
+use crate::ical::serializer::{self, ICSAble, ICSAbleWithName};
+use std::vec::IntoIter;
+use std::error::Error;
+use crate::ical::parser::{Parsable, ContentLine};
 
-/* RFC5545 3.6.1 */
+
 make_ical_comp_struct! {
+    /// RFC5545 3.6.1
     VEvent {
         uid Opt String,
         dtstamp Opt DateTime,
@@ -40,9 +45,6 @@ make_ical_comp_struct! {
         related_to Mul String,
         resources Mul String,
         rdate Mul DateTime,
-
-        ///Includes 3.8.8.1 IANA Properties and 3.8.8.2 Non-Standard/X-Props
-        unknown Vec ICalObject,
     }
 }
 

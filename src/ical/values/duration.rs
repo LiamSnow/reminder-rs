@@ -18,10 +18,11 @@ use super::base::*;
 pub type ICalDuration = TimeDelta;
 
 impl ICalValueType for ICalDuration {
-    ///The RFC is strict on either being date (day + time), time, or week
-    ///but this system is more relaxed
-    ///This also does not require time to include a T
+    /// The RFC is strict on either being date (day + time), time, or week
+    /// but this system is more relaxed
+    /// This also does not require time to include a T
     fn parse(value: &str, _: &ICalParameterMap) -> Result<Self, Box<dyn Error>> {
+        // println!("parsing duration {}", value);
         let mut chars = value.chars();
         let inverted = find_sign(&mut chars)?;
         let duration = parse_duration(&mut chars)?;
@@ -29,64 +30,132 @@ impl ICalValueType for ICalDuration {
     }
 
     fn serialize(&self) -> String {
-        todo!()
+        let is_neg = self.le(&TimeDelta::zero());
+        let prefix = if is_neg { "-P" } else { "P" };
+        let dur_abs = self.abs();
+        let mut str = prefix.to_string();
+
+        let weeks = dur_abs.num_weeks();
+        let total_days = dur_abs.num_days();
+        let days = total_days - (weeks * 7);
+        let hours = dur_abs.num_hours() - (total_days * 24);
+        let minutes = dur_abs.num_minutes() - (dur_abs.num_hours() * 60);
+        let seconds = dur_abs.num_seconds() - (dur_abs.num_minutes() * 60);
+        let has_time = hours > 0 || minutes > 0 || seconds > 0;
+
+        //dur-weeks
+        if !has_time && days == 0 { //has exact number of weeks
+            push_comp(&mut str, weeks, "W");
+        }
+        else {
+            if total_days > 0 {
+                push_comp(&mut str, total_days, "D");
+            }
+            if has_time {
+                serialize_time(&mut str, hours, minutes, seconds);
+            }
+        }
+
+        str
     }
+}
+
+fn serialize_time(str: &mut String, hours: i64, minutes: i64, seconds: i64) {
+    *str += "T";
+    if seconds > 0 {
+        push_comp(str, hours, "H");
+        push_comp(str, minutes, "M");
+        push_comp(str, seconds, "S");
+    }
+    else if minutes > 0 {
+        push_comp(str, hours, "H");
+        push_comp(str, minutes, "M");
+    }
+    else if hours > 0 {
+        push_comp(str, hours, "H");
+    }
+}
+
+fn push_comp(str: &mut String, num: i64, typ: &str) {
+    *str += num.to_string().as_str();
+    *str += typ;
 }
 
 fn parse_duration(chars: &mut Chars<'_>) -> Result<TimeDelta, Box<dyn Error>> {
-    let (mut weeks, mut days, mut hours, mut minutes, mut seconds) = (0, 0, 0, 0, 0);
+    let mut comps = [0; 5];
     let mut num_buffer = String::new();
-
     for char in chars {
-        if char.is_numeric() {
-            num_buffer.push(char);
-            continue;
-        }
-
-        let num: i64 = num_buffer.parse()?;
-        num_buffer.clear();
-
         match char {
             'T' => continue,
-            'W' => weeks = num,
-            'D' => days = num,
-            'H' => hours = num,
-            'M' => minutes = num,
-            'S' => seconds = num,
+            '0'..='9' => num_buffer.push(char),
+            'W' => comps[0] = num_buffer.parse()?,
+            'D' => comps[1] = num_buffer.parse()?,
+            'H' => comps[2] = num_buffer.parse()?,
+            'M' => comps[3] = num_buffer.parse()?,
+            'S' => comps[4] = num_buffer.parse()?,
             _ => return Err(format!("Unexpected character {} in duration string", char).into()),
         }
+        if !char.is_numeric() {
+            num_buffer.clear();
+        }
     }
-
-    Ok(TimeDelta::weeks(weeks)
-        + TimeDelta::days(days)
-        + TimeDelta::hours(hours)
-        + TimeDelta::minutes(minutes)
-        + TimeDelta::seconds(seconds))
+    Ok(TimeDelta::weeks(comps[0]) + TimeDelta::days(comps[1]) +
+       TimeDelta::hours(comps[2]) + TimeDelta::minutes(comps[3]) +
+       TimeDelta::seconds(comps[4]))
 }
 
 fn find_sign(chars: &mut Chars<'_>) -> Result<bool, String> {
-    let sign;
-    let first_char = chars.next().ok_or("Empty Duration String".to_string())?;
-    match first_char {
-        '-' => sign = true,
-        '+' => sign = false,
-        'P' => return Ok(false),
-        _ => {
-            return Err(format!(
-                "Duration string should start with P but found {}",
-                first_char
-            ))
-        }
+    let sign = match chars.next() {
+        Some('-') => true,
+        Some('+') => false,
+        Some('P') => return Ok(false),
+        Some(c) => return Err(format!("Duration string should start with P but found {}", c)),
+        None => return Err("Empty duration String".to_string()),
+    };
+    match chars.next() {
+        Some('P') => Ok(sign),
+        _ => Err("Duration string too short".to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use crate::ical::values::base::*;
+    use crate::ical::values::duration::*;
+
+    fn assert_duration(value: &str, expected_weeks: i64, expected_days: i64, expected_hours: i64, expected_minutes: i64, expected_seconds: i64) {
+        let dur = ICalDuration::parse(value, &HashMap::new()).expect("Failed to parse!");
+
+        let weeks = dur.num_weeks();
+        let days = dur.num_days() - (weeks * 7);
+        let hours = dur.num_hours() - (dur.num_days() * 24);
+        let minutes = dur.num_minutes() - (dur.num_hours() * 60);
+        let seconds = dur.num_seconds() - (dur.num_minutes() * 60);
+
+        assert_eq!(weeks, expected_weeks, "Weeks wrong");
+        assert_eq!(days, expected_days, "Days wrong");
+        assert_eq!(hours, expected_hours, "Hours wrong");
+        assert_eq!(minutes, expected_minutes, "Minutes wrong");
+        assert_eq!(seconds, expected_seconds, "Seconds wrong");
+
+        let s = ICalValueType::serialize(&dur);
+        assert_eq!(s, value, "Serialization wrong");
     }
 
-    let second_char = chars
-        .next()
-        .ok_or("Duration String too Short".to_string())?;
-    if second_char != 'P' {
-        return Err(format!(
-            "Duration string should have P but found {}",
-            second_char
-        ));
+    #[test]
+    fn test_duration_date() {
+        assert_duration("P15DT5H0M20S", 2, 1, 5, 0, 20);
     }
-    Ok(sign)
+
+    #[test]
+    fn test_duration_weeks() {
+        assert_duration("P7W", 7, 0, 0, 0, 0);
+    }
+
+    #[test]
+    fn test_negative_duration() {
+        assert_duration("-P1D", 0, -1, 0, 0, 0);
+    }
 }

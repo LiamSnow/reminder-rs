@@ -63,16 +63,18 @@ async fn main() {
 async fn search_todos(client: &CalDAVClient, cal_ref: &RefCell<Calendar>, term: &str) {
     let mut has_printed = false;
     let todos = client.get_current_todos(cal_ref).await;
-    for todo in todos.as_ref() {
-        let summary = todo.get_summary().unwrap_or("");
-        if summary.contains(term) {
-            if !has_printed {
-                println!("Todos for {}", cal_ref.borrow().fancy_name());
-                has_printed = true;
-            }
-            println!("{summary}");
-        }
-    }
+    // for todo in todos.as_ref() {
+    //     let s = todo.vtodo.summary.0.unwrap();
+    //     let summary = s.value;
+    //
+    //     if summary.contains(term) {
+    //         if !has_printed {
+    //             println!("Todos for {}", cal_ref.borrow().fancy_name());
+    //             has_printed = true;
+    //         }
+    //         println!("{summary}");
+    //     }
+    // }
 }
 
 async fn print_todos(client: &CalDAVClient, cal_ref: &RefCell<Calendar>) {
@@ -80,8 +82,8 @@ async fn print_todos(client: &CalDAVClient, cal_ref: &RefCell<Calendar>) {
 
     let todos = client.get_current_todos(&cal_ref).await;
     for todo in todos.as_ref() {
-        let summary = todo.get_summary().unwrap_or("Error");
-        println!("{summary}");
+        let summary = todo.vtodo.summary.get_value().unwrap();
+        println!("{}", summary);
     }
 }
 

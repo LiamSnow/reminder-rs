@@ -1,8 +1,11 @@
 use minidom::Element;
 
-use crate::ical::todo::CalendarTodo;
+use crate::ical::objects::{
+    generics::{ICalObject, VCalendar},
+    vtodo::VTodo,
+};
 
-use super::client::Calendar;
+use super::{client::Calendar, types::CalendarTodo};
 
 pub const NS_D: &str = "DAV:";
 pub const NS_C: &str = "urn:ietf:params:xml:ns:caldav";
@@ -58,6 +61,22 @@ pub fn parse_todo_report(el: &Element) -> Option<CalendarTodo> {
     let url = follow_tree(el, "href", NS_D)?.text();
     let prop = follow_tree(el, "propstat.prop", NS_D)?;
     let etag = prop.get_child("getetag", NS_D)?.text();
-    let data = prop.get_child("calendar-data", NS_C)?.text();
-    CalendarTodo::parse(data, etag, url)
+    let ics = prop.get_child("calendar-data", NS_C)?.text();
+    let mut vcal = VCalendar::parse(&ics).ok()?;
+    let vtodo = vcal.children.iter()
+        .position(|child| matches!(child, ICalObject::VTodo(_)))
+        .and_then(|index| {
+            if let ICalObject::VTodo(todo) = vcal.children.remove(index) {
+                Some(todo)
+            } else {
+                None
+            }
+        });
+
+    Some(CalendarTodo {
+        etag,
+        url,
+        vcal,
+        vtodo: vtodo?,
+    })
 }

@@ -1,10 +1,13 @@
-
 use crate::ical::values::{base::*, integer::*, string::*, duration::*};
-
 use super::{generics::*, macros::*};
+use crate::ical::serializer::{self, ICSAble, ICSAbleWithName};
+use std::vec::IntoIter;
+use std::error::Error;
+use crate::ical::parser::{Parsable, ContentLine};
 
-/* RFC5545 3.6.6 */
+
 make_ical_comp_struct! {
+    /// RFC5545 3.6.6
     VAlarm {
         action Opt String,
         description Opt String,
@@ -14,9 +17,6 @@ make_ical_comp_struct! {
         repeat Opt Integer,
         attach Opt String,
         attendee Mul String,
-
-        ///Includes 3.8.8.1 IANA Properties and 3.8.8.2 Non-Standard/X-Props
-        unknown Vec ICalObject,
     }
 }
 
@@ -39,3 +39,12 @@ impl Validadable for VAlarm {
         todo!()
     }
 }
+
+impl ICSAbleWithName for Vec<VAlarm> {
+    fn to_ics_with_name(&self, _: &str, ics: &mut String) {
+        for child in self {
+            child.to_ics(ics);
+        }
+    }
+}
+
