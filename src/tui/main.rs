@@ -5,14 +5,13 @@ use ratatui::crossterm::terminal::{
 };
 use ratatui::prelude::{Backend, CrosstermBackend};
 use ratatui::Terminal;
-use std::error::Error;
 use std::io;
 
 use crate::caldav::client::CalDAVClient;
 
 use super::app::App;
 
-pub fn start(client: CalDAVClient) -> Result<(), Box<dyn Error>> {
+pub fn start(client: CalDAVClient) -> anyhow::Result<()> {
     //setup
     enable_raw_mode()?;
     let mut stderr = io::stderr(); // This is a special case. Normally using stdout is fine

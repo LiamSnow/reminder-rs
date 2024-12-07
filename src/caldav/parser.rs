@@ -1,11 +1,5 @@
 use minidom::Element;
-
-use crate::ical::objects::{
-    generics::{ICalObject, VCalendar},
-    vtodo::VTodo,
-};
-
-use super::{client::Calendar, types::CalendarTodo};
+use url::Url;
 
 pub const NS_D: &str = "DAV:";
 pub const NS_C: &str = "urn:ietf:params:xml:ns:caldav";
@@ -25,58 +19,27 @@ pub fn follow_tree(el: &Element, tree: &str, namespace: &str) -> Option<Element>
     Some(cur_el.clone())
 }
 
-pub fn parse_cal_propfind(el: &Element) -> Option<Calendar> {
-    let url = follow_tree(el, "href", NS_D)?.text();
-    let prop = follow_tree(el, "propstat.prop", NS_D)?;
-    let name = prop.get_child("displayname", NS_D)?.text();
-    let ctag = prop.get_child("getctag", NS_CS)?.text();
-    let color = prop
-        .get_child("calendar-color", NS_I)
-        .and_then(|c| Some(c.text()));
-    let description = prop
-        .get_child("calendar-description", NS_C)
-        .and_then(|c| Some(c.text()));
-
-    let supports_todo = prop
-        .get_child("supported-calendar-component-set", NS_C)?
-        .nodes()
-        .filter_map(|node| node.as_element()?.attr("name"))
-        .any(|name| name.contains("VTODO"));
-
-    //unclear why addressbook's say they support VTODO but idk
-    let is_calendar = prop
-        .get_child("resourcetype", NS_D)?
-        .nodes()
-        .filter_map(|node| node.as_element())
-        .any(|elem| elem.name() == "calendar");
-
-    if !supports_todo || !is_calendar {
-        return None;
-    }
-
-    Some(Calendar::new(url, name, ctag, color, description))
+pub fn add_path(url: &str, path: &str) -> String {
+    let base = url.trim_end_matches('/');
+    let path = path.trim_start_matches('/');
+    format!("{}/{}", base, path)
 }
 
-pub fn parse_todo_report(el: &Element) -> Option<CalendarTodo> {
-    let url = follow_tree(el, "href", NS_D)?.text();
-    let prop = follow_tree(el, "propstat.prop", NS_D)?;
-    let etag = prop.get_child("getetag", NS_D)?.text();
-    let ics = prop.get_child("calendar-data", NS_C)?.text();
-    let mut vcal = VCalendar::parse(&ics).ok()?;
-    let vtodo = vcal.children.iter()
-        .position(|child| matches!(child, ICalObject::VTodo(_)))
-        .and_then(|index| {
-            if let ICalObject::VTodo(todo) = vcal.children.remove(index) {
-                Some(todo)
+pub fn go_back(url: &str) -> String {
+    let url = url.trim_end_matches('/');
+    match Url::parse(url) {
+        Ok(mut parsed_url) => {
+            let segments: Vec<_> = parsed_url.path_segments()
+                .map(|segments| segments.collect::<Vec<_>>())
+                .unwrap_or_default();
+            if !segments.is_empty() {
+                let new_path = segments[..segments.len() - 1].join("/");
+                parsed_url.set_path(&new_path);
             } else {
-                None
+                parsed_url.set_path("/");
             }
-        });
-
-    Some(CalendarTodo {
-        etag,
-        url,
-        vcal,
-        vtodo: vtodo?,
-    })
+            parsed_url.to_string()
+        },
+        Err(_) => url.to_string(),
+    }
 }

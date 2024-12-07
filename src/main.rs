@@ -1,7 +1,7 @@
 use std::{cell::RefCell, env};
 use dotenv::dotenv;
 use args::*;
-use caldav::client::{CalDAVClient, Calendar};
+use caldav::{calendar::Calendar, client::CalDAVClient};
 use clap::Parser;
 
 mod caldav;
@@ -80,7 +80,7 @@ async fn search_todos(client: &CalDAVClient, cal_ref: &RefCell<Calendar>, term: 
 async fn print_todos(client: &CalDAVClient, cal_ref: &RefCell<Calendar>) {
     println!("Todos for {}", cal_ref.borrow().fancy_name());
 
-    let todos = client.get_current_todos(&cal_ref).await;
+    let todos = client.get_current_todos(&cal_ref).await.expect("get current todos failed :(");
     for todo in todos.as_ref() {
         let summary = todo.vtodo.summary.get_value().unwrap();
         println!("{}", summary);

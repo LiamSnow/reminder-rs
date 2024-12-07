@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::caldav::client::{CalDAVClient, Calendar};
+use crate::caldav::{calendar::Calendar, client::CalDAVClient};
 
 
 

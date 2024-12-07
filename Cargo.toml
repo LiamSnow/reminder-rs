@@ -4,19 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-base64 = "0.22.1"
 chrono = { version = "0.4.33", features = ["serde"] }
 clap = { version = "4.5.15", features = ["derive"] }
-minidom = "0.16.0"
-regex = "1.11.1"
-reqwest = { version = "0.12.6", features = ["json"] }
-strfmt = "0.2.4"
 tokio = { version = "1.39.3", features = ["full"] }
-url = "2.5.2"
-lazy_static = "1.5.0"
-unicode-segmentation = "1.10.1"
 ratatui = "0.29.0"
 crossterm = "0.28.1"
 dotenv = "0.15.0"
-chrono-tz = { version = "0.10.0", features = ["serde", "case-insensitive", "arbitrary"] }
 serde = { version = "1.0", features = ["derive"] }
+anyhow = "1.0.93"
+bon = "3.2.0"
